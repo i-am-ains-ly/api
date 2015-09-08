@@ -220,22 +220,6 @@ class PhrestRequest extends Request
   }
 
   /**
-   * Get the HTTP Method
-   *
-   * @return string
-   */
-  public function getMethod()
-  {
-    if(isset($_GET['method']))
-    {
-      return $_GET['method'];
-    }
-
-    $method = parent::getMethod();
-    return $method;
-  }
-
-  /**
    * Check if this is a JSON request
    * todo
    *
