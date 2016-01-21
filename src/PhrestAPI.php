@@ -2,17 +2,15 @@
 namespace Phrest\API;
 
 use Phalcon\DI;
-use Phrest\API\Collections\Collection;
+use Phalcon\DI\FactoryDefault as DefaultDI;
+use Phalcon\DiInterface;
+use Phalcon\Exception;
+use Phalcon\Http\Response;
+use Phalcon\Mvc\Micro as MicroMVC;
 use Phalcon\Mvc\Micro\Collection as PhalconCollection;
-use Phrest\API\Collections\CollectionRoute;
 use Phrest\API\DI\PhrestDI;
 use Phrest\API\Request\PhrestRequest;
-use Phrest\API\Responses\CSVResponse;
 use Phrest\API\Responses\JSONResponse;
-use Phalcon\DI\FactoryDefault as DefaultDI;
-use Phalcon\Exception;
-use Phalcon\Mvc\Micro as MicroMVC;
-use Phalcon\Http\Response;
 use Phrest\SDK\PhrestSDK;
 
 /**
@@ -29,10 +27,10 @@ class PhrestAPI extends MicroMVC
   /** @var bool */
   public $isInternalRequest = false;
 
-  public function __construct(PhrestDI $di, $srcDir = null)
+  public function __construct(PhrestDI $di, $srcDir = null, $mountBeforeDispatch = true)
   {
     // Set the applications src directory
-    if(!$srcDir)
+    if (!$srcDir)
     {
       // Assume the src directory based on standard structure
       $srcDir = dirname(dirname(dirname(dirname(__DIR__)))) . '/src';
@@ -61,7 +59,7 @@ class PhrestAPI extends MicroMVC
       function () use ($di)
       {
         // Method
-        if(PhrestSDK::$method && PhrestSDK::$uri)
+        if (PhrestSDK::$method && PhrestSDK::$uri)
         {
           // Set exception message
           $message = sprintf(
@@ -86,10 +84,9 @@ class PhrestAPI extends MicroMVC
       }
     );
 
-    // Mount all of the collections, which makes the routes active.
-    foreach($di->get('collections') as $collection)
+    if ($mountBeforeDispatch)
     {
-      $this->mount($collection);
+      $this->mountCollections($di);
     }
 
     // Send the response if required
@@ -97,14 +94,14 @@ class PhrestAPI extends MicroMVC
       function () use ($di)
       {
         // Internal request will return the response
-        if($this->isInternalRequest)
+        if ($this->isInternalRequest)
         {
           return;
         }
 
         $controllerResponse = $this->getReturnedValue();
 
-        if(is_a($controllerResponse, 'Phrest\API\Responses\ResponseArray'))
+        if (is_a($controllerResponse, 'Phrest\API\Responses\ResponseArray'))
         {
           /** @var $controllerResponse \Phrest\API\Responses\ResponseArray */
           $controllerResponse->setCount($controllerResponse->getCount());
@@ -115,7 +112,7 @@ class PhrestAPI extends MicroMVC
         /** @var PhrestRequest $response */
         $request = $di->get('request');
 
-        if($request->isJSON())
+        if ($request->isJSON())
         {
           $di->set('response', new JSONResponse($controllerResponse));
         }
@@ -142,7 +139,7 @@ class PhrestAPI extends MicroMVC
     $collections = $this->getCollections();
 
     $phalconCollections = [];
-    foreach($collections as $collection)
+    foreach ($collections as $collection)
     {
       $phalconCollection = new PhalconCollection();
 
@@ -153,7 +150,7 @@ class PhrestAPI extends MicroMVC
         ->setHandler($collection->controller)
         ->setLazy(true);
 
-      foreach($collection->routes as $route)
+      foreach ($collection->routes as $route)
       {
         // Switch should be quicker
         switch($route->type)
@@ -230,7 +227,7 @@ class PhrestAPI extends MicroMVC
         /** @var $exception Exception */
 
         // Handled exceptions
-        if(is_a($exception, 'Phrest\API\\Exceptions\\HandledException'))
+        if (is_a($exception, 'Phrest\API\\Exceptions\\HandledException'))
         {
           /** @var Response $response */
           $response = $di->get('response');
@@ -249,5 +246,18 @@ class PhrestAPI extends MicroMVC
         throw $exception;
       }
     );
+  }
+
+  /**
+   * Mount all of the collections, which makes the routes active.
+   *
+   * @param DiInterface $di
+   */
+  public function mountCollections(DiInterface $di)
+  {
+    foreach ($di->get('collections') as $collection)
+    {
+      $this->mount($collection);
+    }
   }
 }
